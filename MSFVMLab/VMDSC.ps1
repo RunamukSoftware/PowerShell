@@ -23,9 +23,8 @@ configuration LabDC{
     Node $ComputerName{
         xIPAddress SetIP
         {
-            IPAddress      = '10.10.10.1'
+            IPAddress      = '10.10.10.1/24'
             InterfaceAlias = $NIC
-            SubnetMask     = 24
             AddressFamily  = 'IPV4'
  
         }
@@ -65,6 +64,12 @@ configuration LabDC{
             IncludeAllSubFeature = $true
         }
 
+        WindowsFeature RSATFAiloverClustering
+        { 
+            Ensure = 'Present'
+            Name = 'RSAT-Clustering'
+            IncludeAllSubFeature = $true
+        }
         xADDomain SetupDomain {
             DomainAdministratorCredential= $DomainCred
             DomainName= $DomainName
@@ -91,9 +96,12 @@ $config = @{
     )
 }
 
-$NICInterface = (Get-netadapter -interfaceindex (gwmi Win32_NetworkAdapterConfiguration | Where-Object {$_.DNSdomain -ne 'mshome.net' -and $_.description -like '*Hyper-V*'}).Interfaceindex).Name
+$NICInterface = (Get-netadapter -interfaceindex (Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {$_.DNSdomain -ne 'mshome.net' -and $_.description -like '*Hyper-V*'}).Interfaceindex).Name
 if(Test-Path .\LabDC){Remove-Item -Recurse .\LabDC}
 labdc -ComputerName 'localhost' -DomainName $DName -DomainCred $DCred -NIC $NICInterface -ConfigurationData $config
 
 Set-DscLocalConfigurationManager -Path .\LabDC -Verbose
 Start-DscConfiguration -Path .\LabDC -Verbose -Force -Wait
+
+#Set up Temp File Share. Should be replaced with DSC config
+New-SmbShare -name Temp -Path 'C:\Temp' -FullAccess Everyone
